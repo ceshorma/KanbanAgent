@@ -17,6 +17,7 @@ import {
   ChevronUp,
   CheckCircle2,
   XCircle,
+  Loader2,
 } from "lucide-react";
 
 const evidenceIcons: Record<string, React.ElementType> = {
@@ -36,9 +37,31 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-function ReviewCard({ task }: { task: Task }) {
+function ReviewCard({
+  task,
+  onDecision,
+}: {
+  task: Task;
+  onDecision: (taskId: string, decision: "approve" | "reject", comment: string) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const agent = task.agentId ? getAgentById(task.agentId) : null;
+
+  async function handleDecision(decision: "approve" | "reject") {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      await onDecision(task.id, decision, comment);
+      setComment("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to submit review");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
@@ -82,6 +105,7 @@ function ReviewCard({ task }: { task: Task }) {
             size="sm"
             variant="outline"
             onClick={() => setExpanded(!expanded)}
+            aria-label={expanded ? "Collapse details" : "Expand details"}
           >
             {expanded ? (
               <ChevronUp className="h-4 w-4" />
@@ -89,12 +113,23 @@ function ReviewCard({ task }: { task: Task }) {
               <ChevronDown className="h-4 w-4" />
             )}
           </Button>
-          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 gap-1">
-            <CheckCircle2 className="h-3.5 w-3.5" />
+          <Button
+            size="sm"
+            className="bg-emerald-600 hover:bg-emerald-700 gap-1"
+            onClick={() => handleDecision("approve")}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
             Approve
           </Button>
-          <Button size="sm" variant="destructive" className="gap-1">
-            <XCircle className="h-3.5 w-3.5" />
+          <Button
+            size="sm"
+            variant="destructive"
+            className="gap-1"
+            onClick={() => handleDecision("reject")}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
             Reject
           </Button>
         </div>
@@ -105,18 +140,14 @@ function ReviewCard({ task }: { task: Task }) {
         <div className="border-t border-gray-100 px-5 py-4 bg-gray-50 space-y-4">
           {/* Description */}
           <div>
-            <h4 className="text-xs font-medium text-gray-500 mb-1">
-              Description
-            </h4>
+            <h4 className="text-xs font-medium text-gray-500 mb-1">Description</h4>
             <p className="text-sm text-gray-700">{task.description}</p>
           </div>
 
           {/* Evidence */}
           {task.evidence.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-gray-500 mb-2">
-                Evidence
-              </h4>
+              <h4 className="text-xs font-medium text-gray-500 mb-2">Evidence</h4>
               <div className="space-y-2">
                 {task.evidence.map((ev) => {
                   const Icon = evidenceIcons[ev.type] || FileText;
@@ -128,24 +159,15 @@ function ReviewCard({ task }: { task: Task }) {
                       <Icon className="h-4 w-4 text-gray-400 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-0.5">
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] border-gray-200 text-gray-500"
-                          >
+                          <Badge variant="outline" className="text-[10px] border-gray-200 text-gray-500">
                             {ev.type}
                           </Badge>
                           <span className="text-[10px] text-gray-400">
                             {new Date(ev.timestamp).toLocaleString()}
                           </span>
                         </div>
-                        {ev.context && (
-                          <p className="text-xs text-gray-600">{ev.context}</p>
-                        )}
-                        {ev.url && (
-                          <p className="text-xs text-blue-600 truncate">
-                            {ev.url}
-                          </p>
-                        )}
+                        {ev.context && <p className="text-xs text-gray-600">{ev.context}</p>}
+                        {ev.url && <p className="text-xs text-blue-600 truncate">{ev.url}</p>}
                         {ev.content && (
                           <pre className="mt-1 rounded bg-gray-50 p-2 text-xs text-gray-700 overflow-x-auto">
                             {ev.content}
@@ -161,15 +183,22 @@ function ReviewCard({ task }: { task: Task }) {
 
           {/* Comment textarea */}
           <div>
-            <h4 className="text-xs font-medium text-gray-500 mb-1">
+            <label htmlFor={`review-comment-${task.id}`} className="text-xs font-medium text-gray-500 mb-1 block">
               Review Comment (optional)
-            </h4>
+            </label>
             <textarea
+              id={`review-comment-${task.id}`}
               rows={2}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
               placeholder="Add a comment for the agent..."
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-purple-400 focus:ring-1 focus:ring-purple-400 outline-none"
             />
           </div>
+
+          {error && (
+            <p className="text-sm text-red-600" role="alert">{error}</p>
+          )}
         </div>
       )}
     </div>
@@ -177,7 +206,27 @@ function ReviewCard({ task }: { task: Task }) {
 }
 
 export function ReviewQueue() {
-  const reviewTasks = getReviewTasks();
+  const [reviewTasks, setReviewTasks] = useState<Task[]>(getReviewTasks);
+
+  async function handleDecision(
+    taskId: string,
+    decision: "approve" | "reject",
+    comment: string
+  ) {
+    const res = await fetch(`/api/tasks/${taskId}/review-response`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision, comment: comment || undefined }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || "Failed to submit review");
+    }
+
+    // Remove from queue after successful action
+    setReviewTasks((prev) => prev.filter((t) => t.id !== taskId));
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -194,7 +243,7 @@ export function ReviewQueue() {
             pending review, ordered by submission time.
           </p>
           {reviewTasks.map((task) => (
-            <ReviewCard key={task.id} task={task} />
+            <ReviewCard key={task.id} task={task} onDecision={handleDecision} />
           ))}
         </div>
       )}

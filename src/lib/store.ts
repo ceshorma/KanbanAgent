@@ -1,4 +1,20 @@
-import { Task, Agent, Project, ActivityEvent } from "@/types";
+import { Task, Agent, Project, ActivityEvent, TaskStatus } from "@/types";
+import { v4 as uuidv4 } from "uuid";
+
+// --- Valid status transitions ---
+const VALID_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  BACKLOG: ["ASSIGNED", "IN_PROGRESS"],
+  ASSIGNED: ["IN_PROGRESS", "BACKLOG"],
+  IN_PROGRESS: ["REVIEW", "BACKLOG"],
+  REVIEW: ["APPROVED", "REJECTED"],
+  APPROVED: ["DONE"],
+  REJECTED: ["IN_PROGRESS"],
+  DONE: [],
+};
+
+export function isValidTransition(from: TaskStatus, to: TaskStatus): boolean {
+  return VALID_TRANSITIONS[from]?.includes(to) ?? false;
+}
 
 // --- Seed Agents ---
 export const agents: Agent[] = [
@@ -380,7 +396,37 @@ export const activityEvents: ActivityEvent[] = [
   },
 ];
 
-// --- Helper functions ---
+// --- Store mutation helpers ---
+
+export function findTask(id: string): Task | undefined {
+  return tasks.find((t) => t.id === id);
+}
+
+export function updateTask(id: string, updates: Partial<Task>): Task | null {
+  const idx = tasks.findIndex((t) => t.id === id);
+  if (idx === -1) return null;
+  tasks[idx] = { ...tasks[idx], ...updates, updatedAt: new Date().toISOString() };
+  return tasks[idx];
+}
+
+export function deleteTask(id: string): boolean {
+  const idx = tasks.findIndex((t) => t.id === id);
+  if (idx === -1) return false;
+  tasks.splice(idx, 1);
+  return true;
+}
+
+export function addActivityEvent(
+  event: Omit<ActivityEvent, "id" | "timestamp">
+): ActivityEvent {
+  const full: ActivityEvent = {
+    ...event,
+    id: `evt-${uuidv4().slice(0, 8)}`,
+    timestamp: new Date().toISOString(),
+  };
+  activityEvents.push(full);
+  return full;
+}
 
 export function getAgentById(id: string): Agent | undefined {
   return agents.find((a) => a.id === id);

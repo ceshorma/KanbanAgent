@@ -17,14 +17,20 @@ export function Header({ title, subtitle }: HeaderProps) {
         )}
       </div>
       <div className="flex items-center gap-3">
-        <button className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button
+          aria-label="Search tasks"
+          className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        >
           <Search className="h-5 w-5" />
         </button>
-        <button className="relative rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button
+          aria-label="Notifications"
+          className="relative rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+        >
           <Bell className="h-5 w-5" />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" aria-label="Unread notifications" />
         </button>
-        <div className="ml-2 h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center">
+        <div className="ml-2 h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center" aria-label="User avatar">
           <span className="text-xs font-medium text-white">OP</span>
         </div>
       </div>

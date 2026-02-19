@@ -4,15 +4,17 @@ import { Task, TaskStatus, STATUS_LABELS, STATUS_COLORS } from "@/types";
 import { TaskCard } from "./task-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/cn";
+import { Plus } from "lucide-react";
 import { Droppable } from "@hello-pangea/dnd";
 
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
   onTaskClick?: (task: Task) => void;
+  onAddTask?: () => void;
 }
 
-export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) {
+export function KanbanColumn({ status, tasks, onTaskClick, onAddTask }: KanbanColumnProps) {
   return (
     <div className="flex w-72 flex-shrink-0 flex-col rounded-xl bg-gray-50 border border-gray-200">
       {/* Column header */}
@@ -25,6 +27,15 @@ export function KanbanColumn({ status, tasks, onTaskClick }: KanbanColumnProps) 
             {tasks.length}
           </span>
         </div>
+        {onAddTask && (
+          <button
+            onClick={onAddTask}
+            aria-label="Add new task"
+            className="rounded-md p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Cards list */}

@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { tasks, agents, activityEvents } from "@/lib/store";
+import {
+  findTask,
+  updateTask,
+  agents,
+  addActivityEvent,
+  isValidTransition,
+} from "@/lib/store";
 import { TaskStatus } from "@/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -13,12 +19,12 @@ const VALID_STATUSES: TaskStatus[] = [
   "DONE",
 ];
 
-// PATCH /tasks/:id/status — Change task status
+// PATCH /tasks/:id/status — Change task status with transition validation
 export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const task = tasks.find((t) => t.id === params.id);
+  const task = findTask(params.id);
 
   if (!task) {
     return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -34,11 +40,17 @@ export async function PATCH(
     );
   }
 
-  const oldStatus = task.status;
-  const now = new Date().toISOString();
+  // Validate status transition
+  if (!isValidTransition(task.status, status)) {
+    return NextResponse.json(
+      {
+        error: `Invalid transition: ${task.status} → ${status}. Allowed transitions from ${task.status}: ${VALID_STATUSES.filter((s) => isValidTransition(task.status, s)).join(", ") || "none"}`,
+      },
+      { status: 400 }
+    );
+  }
 
-  task.status = status;
-  task.updatedAt = now;
+  const oldStatus = task.status;
 
   // Add comment if provided
   if (comment) {
@@ -47,25 +59,25 @@ export async function PATCH(
       author: "System",
       authorType: "agent",
       content: comment,
-      timestamp: now,
+      timestamp: new Date().toISOString(),
     });
   }
+
+  const updated = updateTask(params.id, { status });
 
   // Log activity
   const agent = task.agentId
     ? agents.find((a) => a.id === task.agentId)
     : null;
 
-  activityEvents.push({
-    id: `evt-${uuidv4().slice(0, 8)}`,
+  addActivityEvent({
     type: "status_change",
     taskId: task.id,
     taskTitle: task.title,
     agentId: task.agentId || undefined,
     agentName: agent?.name,
     detail: `Status changed: ${oldStatus} → ${status}`,
-    timestamp: now,
   });
 
-  return NextResponse.json({ task });
+  return NextResponse.json({ task: updated });
 }
